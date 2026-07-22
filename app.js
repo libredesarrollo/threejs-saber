@@ -37,10 +37,14 @@ class BeatSaberGame {
         // 5. Agregar suelo y entorno
         this.setupEnvironment();
 
-        // 6. Manejadores de eventos
+        // 6. Configurar Sables y Controles
+        this.setupSabers();
+        this.setupPointerControls();
+
+        // 7. Manejadores de eventos
         window.addEventListener('resize', () => this.onWindowResize());
 
-        // 7. Iniciar bucle de animación
+        // 8. Iniciar bucle de animación
         this.animate();
     }
 
@@ -60,15 +64,14 @@ class BeatSaberGame {
     }
 
     setupEnvironment() {
-        // Crear una cuadrícula para simular el suelo holográfico
-        const gridXZ = new THREE.GridHelper(50, 50, 0xff0055, 444444);
+        // Cuadrícula para simular el suelo holográfico
+        const gridXZ = new THREE.GridHelper(50, 50, 0xff0055, 0x444444);
         gridXZ.position.y = 0;
-        // Hacer que las líneas centrales resalten en azul
         gridXZ.material.opacity = 0.4;
         gridXZ.material.transparent = true;
         this.scene.add(gridXZ);
 
-        // Añadir una plataforma de pista (donde vienen los bloques)
+        // Pista principal por donde avanzan los bloques
         const trackGeometry = new THREE.BoxGeometry(4, 0.1, 40);
         const trackMaterial = new THREE.MeshStandardMaterial({
             color: 0x11111f,
@@ -81,7 +84,7 @@ class BeatSaberGame {
         track.position.set(0, -0.05, -15);
         this.scene.add(track);
 
-        // Bordes de la pista iluminados con "neon"
+        // Bordes de la pista iluminados con neón
         const leftBorderGeom = new THREE.BoxGeometry(0.1, 0.1, 40);
         const leftBorderMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
         const leftBorder = new THREE.Mesh(leftBorderGeom, leftBorderMat);
@@ -95,20 +98,160 @@ class BeatSaberGame {
         this.scene.add(rightBorder);
     }
 
+    /**
+     * Fábrica para crear un Sable de Luz (Hilt + Blade + Glow + PointLight)
+     */
+    createSaber(colorHex) {
+        const saberGroup = new THREE.Group();
+
+        // 1. Mango (Hilt) metálico
+        const hiltGeom = new THREE.CylinderGeometry(0.025, 0.03, 0.22, 16);
+        const hiltMat = new THREE.MeshStandardMaterial({
+            color: 0x1a1a1a,
+            metalness: 0.95,
+            roughness: 0.2
+        });
+        const hilt = new THREE.Mesh(hiltGeom, hiltMat);
+        hilt.position.y = 0.11; // Alineado desde la base
+        saberGroup.add(hilt);
+
+        // Anillo acentuado en el mango
+        const ringGeom = new THREE.TorusGeometry(0.03, 0.006, 12, 24);
+        const ringMat = new THREE.MeshBasicMaterial({ color: colorHex });
+        const ring = new THREE.Mesh(ringGeom, ringMat);
+        ring.rotation.x = Math.PI / 2;
+        ring.position.y = 0.2;
+        saberGroup.add(ring);
+
+        // 2. Núcleo blanco brillante de la hoja (Blade Core)
+        const coreGeom = new THREE.CylinderGeometry(0.016, 0.016, 1.1, 16);
+        const coreMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const core = new THREE.Mesh(coreGeom, coreMat);
+        core.position.y = 0.22 + 0.55; // Colocado inmediatamente arriba del mango
+        saberGroup.add(core);
+
+        // 3. Hoja exterior translúcida con brillo intenso (Outer Glow)
+        const glowGeom = new THREE.CylinderGeometry(0.032, 0.032, 1.12, 16);
+        const glowMat = new THREE.MeshStandardMaterial({
+            color: colorHex,
+            emissive: colorHex,
+            emissiveIntensity: 3.5,
+            transparent: true,
+            opacity: 0.75,
+            roughness: 0.1
+        });
+        const glow = new THREE.Mesh(glowGeom, glowMat);
+        glow.position.y = 0.22 + 0.55;
+        saberGroup.add(glow);
+
+        // 4. Luz puntual dinámica para iluminar el entorno al mover el sable
+        const saberLight = new THREE.PointLight(colorHex, 3.0, 4);
+        saberLight.position.y = 0.22 + 0.75;
+        saberGroup.add(saberLight);
+
+        // Orientación inicial: inclinado hacia adelante para simular sostenerlo
+        saberGroup.rotation.x = -Math.PI / 4;
+
+        return {
+            group: saberGroup,
+            light: saberLight,
+            targetPos: new THREE.Vector3(),
+            currentPos: new THREE.Vector3(),
+            velocity: new THREE.Vector3()
+        };
+    }
+
+    setupSabers() {
+        // Sable Izquierdo (Rojo)
+        this.leftSaber = this.createSaber(0xff0055);
+        this.leftSaber.targetPos.set(-0.45, 1.2, 1.5);
+        this.leftSaber.currentPos.copy(this.leftSaber.targetPos);
+        this.leftSaber.group.position.copy(this.leftSaber.targetPos);
+        this.scene.add(this.leftSaber.group);
+
+        // Sable Derecho (Azul)
+        this.rightSaber = this.createSaber(0x00f3ff);
+        this.rightSaber.targetPos.set(0.45, 1.2, 1.5);
+        this.rightSaber.currentPos.copy(this.rightSaber.targetPos);
+        this.rightSaber.group.position.copy(this.rightSaber.targetPos);
+        this.scene.add(this.rightSaber.group);
+    }
+
+    setupPointerControls() {
+        this.pointer = new THREE.Vector2(0, 0);
+
+        const updatePointerPosition = (clientX, clientY) => {
+            // Convertir coordenadas de pantalla a espacio normalizado (-1 a 1)
+            this.pointer.x = (clientX / window.innerWidth) * 2 - 1;
+            this.pointer.y = -(clientY / window.innerHeight) * 2 + 1;
+
+            // Proyectar movimiento a coordenadas del mundo 3D
+            const worldX = this.pointer.x * 2.2;
+            const worldY = 1.3 + this.pointer.y * 1.0;
+            const saberZ = 1.5;
+
+            // Actualizar objetivo de posición de cada sable manteniendo distancia relativa
+            this.leftSaber.targetPos.set(worldX - 0.4, worldY, saberZ);
+            this.rightSaber.targetPos.set(worldX + 0.4, worldY, saberZ);
+        };
+
+        // Eventos de ratón
+        window.addEventListener('pointermove', (event) => {
+            updatePointerPosition(event.clientX, event.clientY);
+        });
+
+        // Soporte Multi-Touch para dispositivos móviles/táctiles
+        window.addEventListener('touchmove', (event) => {
+            if (event.touches.length >= 2) {
+                // Toque 1 -> Sable Izquierdo
+                const t0 = event.touches[0];
+                const x0 = (t0.clientX / window.innerWidth) * 2 - 1;
+                const y0 = -(t0.clientY / window.innerHeight) * 2 + 1;
+                this.leftSaber.targetPos.set(x0 * 2.2, 1.3 + y0 * 1.0, 1.5);
+
+                // Toque 2 -> Sable Derecho
+                const t1 = event.touches[1];
+                const x1 = (t1.clientX / window.innerWidth) * 2 - 1;
+                const y1 = -(t1.clientY / window.innerHeight) * 2 + 1;
+                this.rightSaber.targetPos.set(x1 * 2.2, 1.3 + y1 * 1.0, 1.5);
+            } else if (event.touches.length === 1) {
+                const t0 = event.touches[0];
+                updatePointerPosition(t0.clientX, t0.clientY);
+            }
+        }, { passive: true });
+    }
+
     onWindowResize() {
-        // Actualizar aspect ratio de la cámara
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
 
-        // Actualizar tamaño de renderizador
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+
+    updateSaber(saber) {
+        // Interpolación suave (lerp) para movimiento fluido
+        const prevPos = saber.currentPos.clone();
+        saber.currentPos.lerp(saber.targetPos, 0.25);
+        saber.group.position.copy(saber.currentPos);
+
+        // Calcular velocidad de movimiento para oscilación/inercia física (sway)
+        saber.velocity.subVectors(saber.currentPos, prevPos);
+
+        // Aplicar rotación dinámica de oscilación basada en velocidad
+        const targetRotZ = -saber.velocity.x * 2.5;
+        const targetRotX = -Math.PI / 4 + saber.velocity.y * 2.0;
+
+        saber.group.rotation.z += (targetRotZ - saber.group.rotation.z) * 0.2;
+        saber.group.rotation.x += (targetRotX - saber.group.rotation.x) * 0.2;
     }
 
     animate() {
         requestAnimationFrame(() => this.animate());
 
-        // Aquí se agregarán actualizaciones de la física/elementos en las siguientes fases
+        // Actualizar posición y rotación dinámica de ambos sables
+        if (this.leftSaber) this.updateSaber(this.leftSaber);
+        if (this.rightSaber) this.updateSaber(this.rightSaber);
 
         // Renderizar la escena
         this.renderer.render(this.scene, this.camera);
