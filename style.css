@@ -43,11 +43,12 @@ body, html {
     width: 100%;
     height: 100%;
     z-index: 10;
-    pointer-events: none; /* Permite interactuar con el canvas por debajo */
+    pointer-events: none;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 2.5rem;
+    align-items: center;
+    padding: 2rem;
     background: radial-gradient(circle at center, transparent 40%, rgba(6, 6, 12, 0.8) 100%);
 }
 
@@ -57,19 +58,51 @@ header {
 }
 
 header h1 {
-    font-size: 3rem;
+    font-size: 2.8rem;
     font-weight: 900;
     letter-spacing: 4px;
     text-transform: uppercase;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0.2rem;
     text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
 }
 
 .subtitle {
-    font-size: 1rem;
+    font-size: 0.9rem;
     text-transform: uppercase;
     letter-spacing: 2px;
     opacity: 0.7;
+}
+
+/* Marcador HUD de Puntuación */
+#hud-score-board {
+    display: flex;
+    gap: 3rem;
+    background: rgba(10, 10, 20, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    padding: 0.8rem 2rem;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    margin-top: 1rem;
+}
+
+.score-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.score-card .label {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    opacity: 0.6;
+    margin-bottom: 0.2rem;
+}
+
+.score-card .value {
+    font-size: 2.2rem;
+    font-weight: 900;
+    letter-spacing: 2px;
 }
 
 /* Colores de sable láser con efecto de brillo de texto (Neon Glow) */
@@ -90,9 +123,9 @@ header h1 {
 /* Instrucciones en la parte inferior */
 #instructions {
     text-align: center;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     letter-spacing: 1px;
-    opacity: 0.6;
+    opacity: 0.85;
     animation: pulse 2s infinite ease-in-out;
 }
 
@@ -106,6 +139,6 @@ header h1 {
 
 /* Micro-animación sutil */
 @keyframes pulse {
-    0%, 100% { opacity: 0.4; }
-    50% { opacity: 0.8; }
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 0.9; }
 }
