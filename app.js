@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 
-// Configuración general del juego
+// Configuración general del juego Beat Saber
 class BeatSaberGame {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         
-        // 1. Inicializar escena
+        // 1. Inicializar escena 3D
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x06060c);
         this.scene.fog = new THREE.FogExp2(0x06060c, 0.03);
@@ -34,23 +34,40 @@ class BeatSaberGame {
         this.blocks = [];
         this.particles = [];
         this.clock = new THREE.Clock();
-        this.lastSpawnTime = 0;
-        this.spawnInterval = 1.1; // Segundos entre cada bloque
+        this.isPlaying = false;
 
-        // Elementos DOM del HUD
+        // Configuración del Spawner Sincronizado por Audio
+        this.blockSpeed = 14.0; // Velocidad de avance de bloques
+        this.spawnZ = -35.0; // Posición lejana de aparición
+        this.hitZ = 1.5; // Plano de corte del jugador
+        this.leadTime = Math.abs(this.spawnZ - this.hitZ) / this.blockSpeed; // Lead-time exacto (~2.6s)
+
+        this.beatmap = [];
+        this.nextBeatIndex = 0;
+
+        // Elementos DOM del HUD y Modal
         this.scoreValEl = document.getElementById('score-val');
         this.comboValEl = document.getElementById('combo-val');
+        this.audioFileInput = document.getElementById('audio-file-input');
+        this.btnStartSynth = document.getElementById('btn-start-synth');
+        this.audioModal = document.getElementById('audio-modal');
+        this.audioStatusText = document.getElementById('audio-status-text');
 
-        // 5. Setup de la escena
+        // 5. Contexto de Audio Web (para música y sintetizador de sonido de corte)
+        this.audioCtx = null;
+        this.audio = new Audio();
+
+        // 6. Setup de la escena y controles
         this.setupLights();
         this.setupEnvironment();
         this.setupSabers();
         this.setupPointerControls();
+        this.setupAudioListeners();
 
-        // 6. Manejadores de eventos
+        // 7. Manejador de redimensionamiento
         window.addEventListener('resize', () => this.onWindowResize());
 
-        // 7. Iniciar bucle de animación
+        // 8. Iniciar bucle de animación
         this.animate();
     }
 
@@ -155,14 +172,12 @@ class BeatSaberGame {
     }
 
     setupSabers() {
-        // Sable Izquierdo (Rojo)
         this.leftSaber = this.createSaber(0xff0055);
         this.leftSaber.targetPos.set(-0.45, 1.2, 1.5);
         this.leftSaber.currentPos.copy(this.leftSaber.targetPos);
         this.leftSaber.group.position.copy(this.leftSaber.targetPos);
         this.scene.add(this.leftSaber.group);
 
-        // Sable Derecho (Azul)
         this.rightSaber = this.createSaber(0x00f3ff);
         this.rightSaber.targetPos.set(0.45, 1.2, 1.5);
         this.rightSaber.currentPos.copy(this.rightSaber.targetPos);
@@ -208,15 +223,116 @@ class BeatSaberGame {
     }
 
     /**
+     * Sistema de Gestión de Audio y Sincronización de Beatmap
+     */
+    setupAudioListeners() {
+        const initAudioContext = () => {
+            if (!this.audioCtx) {
+                this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+        };
+
+        // Carga de archivo MP3 local del usuario
+        this.audioFileInput.addEventListener('change', (e) => {
+            initAudioContext();
+            const file = e.target.files[0];
+            if (file) {
+                const fileURL = URL.createObjectURL(file);
+                this.audio.src = fileURL;
+                this.audioStatusText.textContent = `Canción cargada: ${file.name}`;
+                this.generateBeatmap(128, 120); // Generar beatmap basado en duración estimada
+                this.startGame();
+            }
+        });
+
+        // Botón de Inicio con Ritmo Sintetizado (120 BPM)
+        this.btnStartSynth.addEventListener('click', () => {
+            initAudioContext();
+            this.audioStatusText.textContent = 'Modo Sintetizado (120 BPM)';
+            this.generateBeatmap(180, 120); // 3 minutos a 120 BPM
+            this.startGame();
+        });
+    }
+
+    /**
+     * Generador de Beatmap Sincronizado (Lista de impactos por segundo)
+     */
+    generateBeatmap(durationSeconds = 120, bpm = 120) {
+        this.beatmap = [];
+        this.nextBeatIndex = 0;
+        const beatInterval = 60 / bpm; // 0.5 segundos por beat
+
+        const lanesX = [-1.2, -0.4, 0.4, 1.2];
+        const heightsY = [0.9, 1.35, 1.8];
+
+        for (let time = 3.0; time < durationSeconds; time += beatInterval) {
+            // Alternar o elegir patrones de bloques
+            const isRed = Math.random() < 0.5;
+            const laneIndex = Math.floor(Math.random() * lanesX.length);
+            const heightIndex = Math.floor(Math.random() * heightsY.length);
+
+            this.beatmap.push({
+                targetHitTime: time,
+                isRed: isRed,
+                x: lanesX[laneIndex],
+                y: heightsY[heightIndex],
+                spawned: false
+            });
+        }
+    }
+
+    startGame() {
+        this.audioModal.style.opacity = '0';
+        this.audioModal.style.transform = 'scale(0.9)';
+        setTimeout(() => {
+            this.audioModal.style.display = 'none';
+        }, 300);
+
+        this.isPlaying = true;
+        this.score = 0;
+        this.combo = 1;
+        this.updateHUD();
+        this.clock.start();
+
+        if (this.audio.src) {
+            this.audio.currentTime = 0;
+            this.audio.play();
+        }
+    }
+
+    /**
+     * Sonido Sintetizado de Corte Láser (Web Audio API)
+     */
+    playSliceSound(isRed) {
+        if (!this.audioCtx) return;
+        try {
+            const osc = this.audioCtx.createOscillator();
+            const gain = this.audioCtx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(isRed ? 440 : 880, this.audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(110, this.audioCtx.currentTime + 0.12);
+
+            gain.gain.setValueAtTime(0.3, this.audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, this.audioCtx.currentTime + 0.12);
+
+            osc.connect(gain);
+            gain.connect(this.audioCtx.destination);
+
+            osc.start();
+            osc.stop(this.audioCtx.currentTime + 0.12);
+        } catch (e) {
+            // Ignorar errores de contexto de audio si no ha interactuado
+        }
+    }
+
+    /**
      * Spawner de Bloques (Cubos)
      */
-    spawnBlock() {
-        const isRed = Math.random() < 0.5;
+    spawnBlock(isRed, spawnX, spawnY) {
         const colorHex = isRed ? 0xff0055 : 0x00f3ff;
-
         const blockGroup = new THREE.Group();
 
-        // 1. Cuerpo principal del cubo (oscuro con transparencia)
         const cubeGeom = new THREE.BoxGeometry(0.45, 0.45, 0.45);
         const cubeMat = new THREE.MeshStandardMaterial({
             color: 0x11111a,
@@ -226,7 +342,6 @@ class BeatSaberGame {
         const cubeMesh = new THREE.Mesh(cubeGeom, cubeMat);
         blockGroup.add(cubeMesh);
 
-        // 2. Borde exterior brillante con color del sable correspondiente
         const borderGeom = new THREE.BoxGeometry(0.47, 0.47, 0.47);
         const borderMat = new THREE.MeshStandardMaterial({
             color: colorHex,
@@ -237,7 +352,6 @@ class BeatSaberGame {
         const borderMesh = new THREE.Mesh(borderGeom, borderMat);
         blockGroup.add(borderMesh);
 
-        // 3. Flecha frontal decorativa indicando la dirección
         const arrowShape = new THREE.Shape();
         arrowShape.moveTo(0, 0.12);
         arrowShape.lineTo(-0.1, -0.08);
@@ -254,14 +368,7 @@ class BeatSaberGame {
         arrowMesh.position.z = 0.23;
         blockGroup.add(arrowMesh);
 
-        // Posicionamiento en uno de los 4 carriles y 3 alturas posibles
-        const lanesX = [-1.2, -0.4, 0.4, 1.2];
-        const heightsY = [0.9, 1.35, 1.8];
-        const spawnX = lanesX[Math.floor(Math.random() * lanesX.length)];
-        const spawnY = heightsY[Math.floor(Math.random() * heightsY.length)];
-        const spawnZ = -35; // Distancia lejana
-
-        blockGroup.position.set(spawnX, spawnY, spawnZ);
+        blockGroup.position.set(spawnX, spawnY, this.spawnZ);
         this.scene.add(blockGroup);
 
         this.blocks.push({
@@ -274,11 +381,10 @@ class BeatSaberGame {
     }
 
     /**
-     * Sistema de Detección de Colisiones entre Sables y Bloques
+     * Detección de Colisiones entre Sables y Bloques
      */
     checkCollisions() {
         const saberSegment = (saber) => {
-            // Obtener el inicio (empuñadura) y el extremo (punta) del sable en el espacio 3D del mundo
             const start = new THREE.Vector3(0, 0.1, 0);
             const end = new THREE.Vector3(0, 1.2, 0);
             saber.group.localToWorld(start);
@@ -293,37 +399,28 @@ class BeatSaberGame {
             const block = this.blocks[i];
             if (block.sliced) continue;
 
-            // Actualizar la BoundingBox 3D del bloque
             block.box.setFromObject(block.mesh);
-
-            // Verificar colisión del sable según el color coincidente
             const targetSeg = block.isRed ? leftSeg : rightSeg;
 
-            // Comprobar la distancia entre el segmento del sable y el centro del bloque
             const blockCenter = new THREE.Vector3();
             block.box.getCenter(blockCenter);
 
             const distToSaber = this.distanceToSegment(blockCenter, targetSeg.start, targetSeg.end);
 
-            // Umbral de tolerancia de colisión (radio del sable + radio del bloque)
             if (distToSaber < 0.38) {
-                // ¡Corte exitoso!
                 block.sliced = true;
+                this.playSliceSound(block.isRed);
                 this.createParticleExplosion(blockCenter, block.colorHex);
                 this.scene.remove(block.mesh);
                 this.blocks.splice(i, 1);
 
-                // Incrementar Puntuación y Combo
                 this.score += 100 * this.combo;
-                this.combo = Math.min(this.combo + 1, 8); // Máximo combo x8
+                this.combo = Math.min(this.combo + 1, 8);
                 this.updateHUD();
             }
         }
     }
 
-    /**
-     * Calcula la distancia más corta entre un punto P y un segmento de línea (A-B)
-     */
     distanceToSegment(P, A, B) {
         const AB = new THREE.Vector3().subVectors(B, A);
         const AP = new THREE.Vector3().subVectors(P, A);
@@ -335,9 +432,6 @@ class BeatSaberGame {
         return P.distanceTo(closestPoint);
     }
 
-    /**
-     * Crea un efecto de explosión de partículas luminosas al cortar un bloque
-     */
     createParticleExplosion(position, colorHex) {
         const particleCount = 18;
         for (let i = 0; i < particleCount; i++) {
@@ -348,7 +442,6 @@ class BeatSaberGame {
 
             particle.position.copy(position);
 
-            // Vector de velocidad hacia afuera aleatorio
             const vel = new THREE.Vector3(
                 (Math.random() - 0.5) * 6,
                 (Math.random() - 0.5) * 6,
@@ -359,7 +452,7 @@ class BeatSaberGame {
             this.particles.push({
                 mesh: particle,
                 velocity: vel,
-                life: 1.0 // 100% de vida
+                life: 1.0
             });
         }
     }
@@ -368,7 +461,7 @@ class BeatSaberGame {
         for (let i = this.particles.length - 1; i >= 0; i--) {
             const p = this.particles[i];
             p.mesh.position.addScaledVector(p.velocity, delta);
-            p.velocity.multiplyScalar(0.92); // Fricción
+            p.velocity.multiplyScalar(0.92);
             p.life -= delta * 2.5;
 
             p.mesh.material.opacity = Math.max(0, p.life);
@@ -417,37 +510,42 @@ class BeatSaberGame {
         requestAnimationFrame(() => this.animate());
 
         const delta = this.clock.getDelta();
-        const elapsedTime = this.clock.getElapsedTime();
+        const currentTime = this.audio.src && !this.audio.paused 
+            ? this.audio.currentTime 
+            : this.clock.getElapsedTime();
 
-        // 1. Spawner de Bloques a intervalos regulares
-        if (elapsedTime - this.lastSpawnTime > this.spawnInterval) {
-            this.spawnBlock();
-            this.lastSpawnTime = elapsedTime;
+        // 1. Spawner Sincronizado por Ritmo/Audio
+        if (this.isPlaying && this.nextBeatIndex < this.beatmap.length) {
+            const beat = this.beatmap[this.nextBeatIndex];
+            // Generar bloque exactamente (targetHitTime - leadTime) segundos antes del impacto
+            if (currentTime >= beat.targetHitTime - this.leadTime) {
+                this.spawnBlock(beat.isRed, beat.x, beat.y);
+                beat.spawned = true;
+                this.nextBeatIndex++;
+            }
         }
 
-        // 2. Mover Bloques activos y despawnear al pasar la cámara
-        const speed = 14.0; // Velocidad constante hacia el jugador
+        // 2. Mover Bloques activos
         for (let i = this.blocks.length - 1; i >= 0; i--) {
             const block = this.blocks[i];
-            block.mesh.position.z += speed * delta;
+            block.mesh.position.z += this.blockSpeed * delta;
 
-            // Si el bloque sobrepasa la posición del jugador sin ser cortado -> Miss
             if (block.mesh.position.z > 3.5) {
                 this.scene.remove(block.mesh);
                 this.blocks.splice(i, 1);
-                this.combo = 1; // Reiniciar combo
+                this.combo = 1;
                 this.updateHUD();
             }
         }
 
-        // 3. Actualizar movimiento de sables
+        // 3. Actualizar sables
         if (this.leftSaber) this.updateSaber(this.leftSaber);
         if (this.rightSaber) this.updateSaber(this.rightSaber);
 
-        // 4. Comprobar Colisiones entre Sables y Bloques
+        // 4. Comprobar colisiones
         this.checkCollisions();
 
-        // 5. Actualizar partículas luminosas
+        // 5. Actualizar partículas
         this.updateParticles(delta);
 
         // 6. Renderizar escena
