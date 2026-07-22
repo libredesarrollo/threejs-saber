@@ -1,0 +1,31 @@
+{
+  "name": "curso-threejs-fundamentos-01",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/libredesarrollo/curso-threejs-fundamentos-01.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/libredesarrollo/curso-threejs-fundamentos-01/issues"
+  },
+  "homepage": "https://github.com/libredesarrollo/curso-threejs-fundamentos-01#readme",
+  "description": "",
+  "dependencies": {
+    "cannon-es": "^0.20.0",
+    "gsap": "^3.15.0",
+    "lil-gui": "^0.21.0",
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "vite": "^8.0.8"
+  }
+}

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Beat Saber 3D - HTML5 & Three.js</title>
+    <meta name="description" content="Un clon moderno e interactivo en 3D de Beat Saber usando Three.js y HTML5.">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import Maps para gestionar las dependencias de ES Modules modernamente -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Canvas donde se renderizará el juego -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Overlay de interfaz de usuario de presentación premium -->
+    <div id="ui-container">
+        <header>
+            <h1>BEAT <span class="neon-text-blue">SABER</span> <span class="neon-text-red">JS</span></h1>
+            <p class="subtitle">Fase 1: Escena 3D & Entorno Virtual</p>
+        </header>
+        
+        <div id="instructions">
+            <p>Usa el mouse para explorar la perspectiva. Pulsa <kbd>F11</kbd> para pantalla completa.</p>
+        </div>
+    </div>
+
+    <!-- Script principal como módulo ES6 -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

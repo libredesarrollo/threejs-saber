@@ -1,0 +1,111 @@
+/* Importar una fuente moderna desde Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;700;900&display=swap');
+
+:root {
+    --bg-color: #06060c;
+    --neon-blue: #00f3ff;
+    --neon-red: #ff0055;
+    --text-color: #ffffff;
+    --font-primary: 'Outfit', sans-serif;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body, html {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-color);
+    font-family: var(--font-primary);
+    color: var(--text-color);
+}
+
+/* Canvas del juego a pantalla completa */
+#game-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    z-index: 1;
+}
+
+/* Contenedor principal de la UI por encima de la escena 3D */
+#ui-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    pointer-events: none; /* Permite interactuar con el canvas por debajo */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2.5rem;
+    background: radial-gradient(circle at center, transparent 40%, rgba(6, 6, 12, 0.8) 100%);
+}
+
+header {
+    text-align: center;
+    pointer-events: auto;
+}
+
+header h1 {
+    font-size: 3rem;
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+}
+
+.subtitle {
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    opacity: 0.7;
+}
+
+/* Colores de sable láser con efecto de brillo de texto (Neon Glow) */
+.neon-text-blue {
+    color: var(--neon-blue);
+    text-shadow: 0 0 5px var(--neon-blue),
+                 0 0 15px var(--neon-blue),
+                 0 0 30px var(--neon-blue);
+}
+
+.neon-text-red {
+    color: var(--neon-red);
+    text-shadow: 0 0 5px var(--neon-red),
+                 0 0 15px var(--neon-red),
+                 0 0 30px var(--neon-red);
+}
+
+/* Instrucciones en la parte inferior */
+#instructions {
+    text-align: center;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    opacity: 0.6;
+    animation: pulse 2s infinite ease-in-out;
+}
+
+#instructions kbd {
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: monospace;
+}
+
+/* Micro-animación sutil */
+@keyframes pulse {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 0.8; }
+}
