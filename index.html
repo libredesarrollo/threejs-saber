@@ -3,8 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Beat Saber 3D - HTML5 & Three.js</title>
-    <meta name="description" content="Un clon moderno e interactivo en 3D de Beat Saber usando Three.js y HTML5.">
+    <title>BEAT SABER 3D — Cyberpunk Rhythm Experience</title>
+    <meta name="description" content="Un clon moderno, ultrarrealista y futurista en 3D de Beat Saber usando Three.js, WebGL Post-Processing y HTML5.">
+    
+    <!-- Google Fonts Sci-Fi & Modern UI -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800;900&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="style.css">
     
     <!-- Import Maps para gestionar las dependencias de ES Modules modernamente -->
@@ -18,50 +24,74 @@
     </script>
 </head>
 <body>
-    <!-- Canvas donde se renderizará el juego -->
+    <!-- Canvas donde se renderizará el juego en 3D -->
     <canvas id="game-canvas"></canvas>
 
     <!-- Overlay de interfaz de usuario de presentación premium -->
     <div id="ui-container">
-        <header>
-            <h1>BEAT <span class="neon-text-blue">SABER</span> <span class="neon-text-red">JS</span></h1>
-            <p class="subtitle">Fase 4: Audio & Sincronización de Ritmo</p>
+        <header class="game-header">
+            <div class="logo-badge">CYBER RHYTHM 3D</div>
+            <h1>BEAT <span class="neon-text-blue">SABER</span> <span class="neon-text-red">XR</span></h1>
+            <p class="subtitle">NEON POST-PROCESSING EDITION</p>
         </header>
-
-        <!-- Marcador HUD de Puntuación -->
-        <div id="hud-score-board">
-            <div class="score-card">
-                <span class="label">PUNTOS</span>
-                <span id="score-val" class="value">000000</span>
-            </div>
-            <div class="score-card">
-                <span class="label">COMBO</span>
-                <span id="combo-val" class="value neon-text-blue">x1</span>
-            </div>
-        </div>
 
         <!-- Panel Modal de Inicio y Carga de Audio -->
         <div id="audio-modal" class="modal-card">
-            <h2>MÚSICA & RITMO</h2>
-            <p class="modal-desc">Carga tu canción MP3 o juega con el sintetizador de ritmo automático (120 BPM).</p>
-            
-            <div class="audio-controls-group">
-                <label for="audio-file-input" class="btn-neon btn-blue">
-                    📂 Cargar Canción MP3
-                    <input type="file" id="audio-file-input" accept="audio/*">
-                </label>
-
-                <button id="btn-start-synth" class="btn-neon btn-red">
-                    ▶ Jugar Ritmo Sintetizado (120 BPM)
-                </button>
+            <div class="modal-header">
+                <span class="modal-tag">MODO DE JUEGO</span>
+                <h2>SELECCIONA TU DESAFÍO</h2>
+                <p class="modal-desc">Elige un ritmo predeterminado o carga tu propia canción MP3 para comenzar la experiencia neón.</p>
             </div>
             
-            <p id="audio-status-text" class="audio-status">Ningún archivo cargado</p>
+            <div class="audio-controls-group">
+                <button id="btn-synth-normal" class="btn-neon btn-blue">
+                    ⚡ RITMO SYNTHWAVE (120 BPM - NORMAL)
+                </button>
+                <button id="btn-synth-hard" class="btn-neon btn-red">
+                    💥 CYBER RUSH (140 BPM - HARD)
+                </button>
+                <button id="btn-synth-expert" class="btn-neon btn-purple">
+                    🔥 EXPERT BLAST (165 BPM - EXPERT)
+                </button>
+
+                <div class="divider"><span>O CARGA TU MP3</span></div>
+
+                <label for="audio-file-input" class="btn-neon btn-outline">
+                    📂 CARGAR ARCHIVO DE MÚSICA MP3
+                    <input type="file" id="audio-file-input" accept="audio/*">
+                </label>
+            </div>
+            
+            <p id="audio-status-text" class="audio-status">Listo para jugar</p>
         </div>
         
-        <div id="instructions">
-            <p>Corta los bloques <span class="neon-text-red">Rojos</span> con el sable izquierdo y los <span class="neon-text-blue">Azules</span> con el sable derecho.</p>
-        </div>
+        <!-- Footer y Marcador HUD de Puntuación Abajo -->
+        <footer id="footer-container">
+            <div id="hud-score-board">
+                <div class="hud-item score-card">
+                    <span class="label">PUNTUACIÓN</span>
+                    <span id="score-val" class="value">000000</span>
+                </div>
+                
+                <div class="hud-item combo-card">
+                    <span class="label">MULTIPLICADOR</span>
+                    <div id="combo-badge" class="combo-badge">
+                        <span id="combo-val" class="value neon-text-blue">x1</span>
+                    </div>
+                </div>
+
+                <div class="hud-item difficulty-card">
+                    <span class="label">MODO</span>
+                    <span id="difficulty-val" class="diff-badge">NORMAL</span>
+                </div>
+            </div>
+
+            <div id="instructions">
+                <div class="instruction-pill">
+                    Corta los bloques <span class="neon-text-red">Rojos</span> con el sable izquierdo y los <span class="neon-text-blue">Azules</span> con el sable derecho.
+                </div>
+            </div>
+        </footer>
     </div>
 
     <!-- Script principal como módulo ES6 -->
