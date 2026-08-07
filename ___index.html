@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>Beat Saber 3D - HTML5 & Three.js</title>
+    <meta name="description" content="Un clon moderno e interactivo en 3D de Beat Saber usando Three.js y HTML5.">
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Import Maps para gestionar las dependencias de ES Modules modernamente -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <!-- Canvas donde se renderizará el juego -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Overlay de interfaz de usuario de presentación premium -->
+    <div id="ui-container">
+        <header>
+            <h1>BEAT <span class="neon-text-blue">SABER</span> <span class="neon-text-red">JS</span></h1>
+            <p class="subtitle">WebXR · Meta Quest · Audio & Ritmo</p>
+        </header>
+
+        <div id="vr-entry" aria-label="Entrada VR"></div>
+
+        <!-- Marcador HUD de Puntuación -->
+        <div id="hud-score-board">
+            <div class="score-card">
+                <span class="label">PUNTOS</span>
+                <span id="score-val" class="value">000000</span>
+            </div>
+            <div class="score-card">
+                <span class="label">COMBO</span>
+                <span id="combo-val" class="value neon-text-blue">x1</span>
+            </div>
+        </div>
+
+        <!-- Panel Modal de Inicio y Carga de Audio -->
+        <div id="audio-modal" class="modal-card">
+            <h2>MÚSICA & RITMO</h2>
+            <p class="modal-desc">Carga tu canción MP3 o juega con el sintetizador de ritmo automático (120 BPM).</p>
+            
+            <div class="audio-controls-group">
+                <label for="audio-file-input" class="btn-neon btn-blue">
+                    📂 Cargar Canción MP3
+                    <input type="file" id="audio-file-input" accept="audio/*">
+                </label>
+
+                <button id="btn-start-synth" class="btn-neon btn-red">
+                    ▶ Jugar Ritmo Sintetizado (120 BPM)
+                </button>
+            </div>
+            
+            <p id="audio-status-text" class="audio-status">Ningún archivo cargado</p>
+        </div>
+        
+        <div id="instructions">
+            <p>Corta los bloques <span class="neon-text-red">Rojos</span> con el sable izquierdo y los <span class="neon-text-blue">Azules</span> con el sable derecho.</p>
+            <p class="vr-hint">Meta Quest: abre esta URL en el navegador (HTTPS), elige música y pulsa <strong>Enter VR</strong>. Los mandos controlan los sables.</p>
+        </div>
+    </div>
+
+    <!-- Script principal como módulo ES6 -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>

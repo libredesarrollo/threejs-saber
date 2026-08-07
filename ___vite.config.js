@@ -1,7 +1,9 @@
+import basicSsl from '@vitejs/plugin-basic-ssl';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/public/proyects/threejs-saber/',
+  plugins: [basicSsl()],
+  base: '/public/projects/threejs/',
   root: './',
   publicDir: 'public',
   build: {
@@ -10,6 +12,6 @@ export default defineConfig({
   },
   server: {
     host: true,
-    port: 3000, // 👈 Añade esta línea con el puerto que desees
-  }
+    https: true,
+  },
 });
