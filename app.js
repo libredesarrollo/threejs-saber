@@ -3,6 +3,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { VRButton } from 'three/addons/webxr/VRButton.js';
 
 /**
  * Motor de Juego Beat Saber 3D — Cyberpunk Post-Processing Edition
@@ -10,7 +11,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 class BeatSaberGame {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
-        
+
         // 1. Inicializar escena 3D
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x030308);
@@ -18,16 +19,16 @@ class BeatSaberGame {
 
         // 2. Inicializar cámara
         this.camera = new THREE.PerspectiveCamera(
-            75, 
-            window.innerWidth / window.innerHeight, 
-            0.1, 
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
             1000
         );
         this.cameraBasePos = new THREE.Vector3(0, 1.6, 3);
         this.camera.position.copy(this.cameraBasePos);
         this.cameraShake = 0;
 
-        // 3. Inicializar renderizador WebGL
+        // 3. Inicializar renderizador WebGL con soporte WebXR VR
         this.renderer = new THREE.WebGLRenderer({
             canvas: this.canvas,
             antialias: true,
@@ -38,6 +39,11 @@ class BeatSaberGame {
         this.renderer.shadowMap.enabled = true;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.2;
+
+        // Activar WebXR y agregar el botón de Realidad Virtual
+        this.renderer.xr.enabled = true;
+        const vrButton = VRButton.createButton(this.renderer);
+        document.body.appendChild(vrButton);
 
         // 4. Pipeline de Post-Procesamiento (Unreal Bloom)
         this.setupPostProcessing();
@@ -55,10 +61,10 @@ class BeatSaberGame {
         this.isPlaying = false;
 
         // Configuración de velocidad y Spawner Sincronizado
-        this.blockSpeed = 14.0; 
-        this.spawnZ = -40.0; 
-        this.hitZ = 1.5; 
-        this.leadTime = Math.abs(this.spawnZ - this.hitZ) / this.blockSpeed; 
+        this.blockSpeed = 14.0;
+        this.spawnZ = -40.0;
+        this.hitZ = 1.5;
+        this.leadTime = Math.abs(this.spawnZ - this.hitZ) / this.blockSpeed;
 
         this.beatmap = [];
         this.nextBeatIndex = 0;
@@ -80,19 +86,20 @@ class BeatSaberGame {
         this.audio = new Audio();
         this.synthTimer = null;
 
-        // 6. Setup de escena, luces y objetos
+        // 6. Setup de escena, luces, objetos y mandos VR
         this.setupLights();
         this.setupEnvironment();
         this.setupStarfield();
         this.setupSabers();
+        this.setupVRControllers();
         this.setupPointerControls();
         this.setupAudioListeners();
 
         // 7. Event Listener de Redimensionamiento
         window.addEventListener('resize', () => this.onWindowResize());
 
-        // 8. Iniciar bucle de animación
-        this.animate();
+        // 8. Iniciar bucle de animación con setAnimationLoop para compatibilidad VR
+        this.renderer.setAnimationLoop(() => this.animate());
     }
 
     /**
@@ -100,7 +107,7 @@ class BeatSaberGame {
      */
     setupPostProcessing() {
         this.composer = new EffectComposer(this.renderer);
-        
+
         const renderPass = new RenderPass(this.scene, this.camera);
         this.composer.addPass(renderPass);
 
@@ -163,7 +170,7 @@ class BeatSaberGame {
 
         // 3. Bordes Láser Neón Laterales de la Pista
         const borderGeom = new THREE.BoxGeometry(0.12, 0.12, 50);
-        
+
         const leftBorderMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff });
         const leftBorder = new THREE.Mesh(borderGeom, leftBorderMat);
         leftBorder.position.set(-2.1, 0.06, -20);
@@ -181,7 +188,7 @@ class BeatSaberGame {
     createTunnelArches() {
         const archCount = 12;
         const archSpacing = 4.5;
-        
+
         for (let i = 0; i < archCount; i++) {
             const archGroup = new THREE.Group();
             const zPos = 5 - i * archSpacing;
@@ -356,6 +363,55 @@ class BeatSaberGame {
         this.scene.add(this.rightSaber.group);
     }
 
+    /**
+     * Configuración del seguimiento 6DOF de Mandos VR (Meta Quest)
+     */
+    setupVRControllers() {
+        this.leftControllerGrip = null;
+        this.rightControllerGrip = null;
+
+        // Compensación ergonómica para orientar la hoja del sable naturalmente hacia adelante
+        this.saberGripRotationOffset = new THREE.Quaternion();
+        this.saberGripRotationOffset.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 4);
+
+        // Obtener los mangos (grips) de los mandos VR
+        const grip0 = this.renderer.xr.getControllerGrip(0);
+        const grip1 = this.renderer.xr.getControllerGrip(1);
+
+        this.scene.add(grip0);
+        this.scene.add(grip1);
+
+        const onConnected = (event, grip) => {
+            const handedness = event.data.handedness;
+            if (handedness === 'left') {
+                this.leftControllerGrip = grip;
+            } else if (handedness === 'right') {
+                this.rightControllerGrip = grip;
+            } else {
+                if (!this.leftControllerGrip) this.leftControllerGrip = grip;
+                else if (!this.rightControllerGrip) this.rightControllerGrip = grip;
+            }
+        };
+
+        const onDisconnected = (event, grip) => {
+            if (this.leftControllerGrip === grip) this.leftControllerGrip = null;
+            if (this.rightControllerGrip === grip) this.rightControllerGrip = null;
+        };
+
+        grip0.addEventListener('connected', (e) => onConnected(e, grip0));
+        grip0.addEventListener('disconnected', (e) => onDisconnected(e, grip0));
+
+        grip1.addEventListener('connected', (e) => onConnected(e, grip1));
+        grip1.addEventListener('disconnected', (e) => onDisconnected(e, grip1));
+
+        // Reanudar contexto de audio Web al iniciar la experiencia VR
+        this.renderer.xr.addEventListener('sessionstart', () => {
+            if (this.audioCtx && this.audioCtx.state === 'suspended') {
+                this.audioCtx.resume();
+            }
+        });
+    }
+
     setupPointerControls() {
         this.pointer = new THREE.Vector2(0, 0);
 
@@ -458,7 +514,7 @@ class BeatSaberGame {
     generateBeatmap(durationSeconds = 180, bpm = 120) {
         this.beatmap = [];
         this.nextBeatIndex = 0;
-        const beatInterval = 60 / bpm; 
+        const beatInterval = 60 / bpm;
 
         const lanesX = [-1.35, -0.45, 0.45, 1.35];
         const heightsY = [0.85, 1.35, 1.85];
@@ -849,29 +905,43 @@ class BeatSaberGame {
         }
     }
 
-    updateSaber(saber) {
+    updateSaber(saber, isLeft = false) {
         const prevPos = saber.currentPos.clone();
-        saber.currentPos.lerp(saber.targetPos, 0.28);
-        saber.group.position.copy(saber.currentPos);
+        const grip = isLeft ? this.leftControllerGrip : this.rightControllerGrip;
 
-        saber.velocity.subVectors(saber.currentPos, prevPos);
+        if (this.renderer.xr.isPresenting && grip && grip.visible) {
+            // Modo VR: Seguimiento 6DOF directo de los mandos Meta Quest
+            grip.getWorldPosition(saber.currentPos);
+            saber.group.position.copy(saber.currentPos);
 
-        const targetRotZ = -saber.velocity.x * 2.8;
-        const targetRotX = -Math.PI / 4 + saber.velocity.y * 2.2;
+            grip.getWorldQuaternion(saber.group.quaternion);
+            if (this.saberGripRotationOffset) {
+                saber.group.quaternion.multiply(this.saberGripRotationOffset);
+            }
 
-        saber.group.rotation.z += (targetRotZ - saber.group.rotation.z) * 0.22;
-        saber.group.rotation.x += (targetRotX - saber.group.rotation.x) * 0.22;
+            saber.velocity.subVectors(saber.currentPos, prevPos);
+        } else {
+            // Modo Escritorio / Pantalla Táctil 2D: Interpolación y ladeo por puntero
+            saber.currentPos.lerp(saber.targetPos, 0.28);
+            saber.group.position.copy(saber.currentPos);
+
+            saber.velocity.subVectors(saber.currentPos, prevPos);
+
+            const targetRotZ = -saber.velocity.x * 2.8;
+            const targetRotX = -Math.PI / 4 + saber.velocity.y * 2.2;
+
+            saber.group.rotation.z += (targetRotZ - saber.group.rotation.z) * 0.22;
+            saber.group.rotation.x += (targetRotX - saber.group.rotation.x) * 0.22;
+        }
     }
 
     /**
      * Bucle Principal de Renderizado y Física 3D
      */
     animate() {
-        requestAnimationFrame(() => this.animate());
-
         const delta = this.clock.getDelta();
-        const currentTime = this.audio.src && !this.audio.paused 
-            ? this.audio.currentTime 
+        const currentTime = this.audio.src && !this.audio.paused
+            ? this.audio.currentTime
             : this.clock.getElapsedTime();
 
         // 1. Spawner Sincronizado por Ritmo
@@ -908,8 +978,8 @@ class BeatSaberGame {
         }
 
         // 4. Actualizar Sables y Colisiones
-        if (this.leftSaber) this.updateSaber(this.leftSaber);
-        if (this.rightSaber) this.updateSaber(this.rightSaber);
+        if (this.leftSaber) this.updateSaber(this.leftSaber, true);
+        if (this.rightSaber) this.updateSaber(this.rightSaber, false);
 
         this.checkCollisions();
 
@@ -927,8 +997,10 @@ class BeatSaberGame {
             this.camera.position.copy(this.cameraBasePos);
         }
 
-        // 7. Renderizado con Post-Procesamiento Bloom
-        if (this.composer) {
+        // 7. Renderizado: Renderizado directo estéreo en VR / Composer en escritorio
+        if (this.renderer.xr.isPresenting) {
+            this.renderer.render(this.scene, this.camera);
+        } else if (this.composer) {
             this.composer.render();
         } else {
             this.renderer.render(this.scene, this.camera);

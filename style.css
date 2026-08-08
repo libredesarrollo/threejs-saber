@@ -395,4 +395,37 @@ body, html {
     }
 }
 
+/* Botón WebXR VR (Estilo Cyberpunk Neón) */
+#VRButton {
+    position: fixed !important;
+    bottom: 25px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 1000 !important;
+    font-family: var(--font-heading) !important;
+    font-size: 0.95rem !important;
+    font-weight: 800 !important;
+    letter-spacing: 2px !important;
+    color: #ffffff !important;
+    background: rgba(10, 10, 25, 0.85) !important;
+    border: 2px solid var(--neon-blue) !important;
+    border-radius: 30px !important;
+    padding: 0.75rem 2rem !important;
+    cursor: pointer !important;
+    text-transform: uppercase !important;
+    box-shadow: 0 0 15px var(--neon-blue-glow), inset 0 0 15px rgba(0, 243, 255, 0.15) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    outline: none !important;
+}
+
+#VRButton:hover {
+    background: var(--neon-blue) !important;
+    color: #000000 !important;
+    box-shadow: 0 0 30px var(--neon-blue), 0 0 60px var(--neon-blue-glow) !important;
+    transform: translateX(-50%) scale(1.06) !important;
+}
+
+
 
