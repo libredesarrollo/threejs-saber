@@ -86,12 +86,14 @@ class BeatSaberGame {
         this.audio = new Audio();
         this.synthTimer = null;
 
-        // 6. Setup de escena, luces, objetos y mandos VR
+        // 6. Setup de escena, luces, objetos, mandos VR e interfaz 3D
         this.setupLights();
         this.setupEnvironment();
         this.setupStarfield();
         this.setupSabers();
         this.setupVRControllers();
+        this.setupVR3DUI();
+        this.setupVRScoreHUD();
         this.setupPointerControls();
         this.setupAudioListeners();
 
@@ -461,27 +463,15 @@ class BeatSaberGame {
 
         // Presets de Sintetizador con distintos niveles de dificultad
         this.btnSynthNormal.addEventListener('click', () => {
-            initAudioContext();
-            this.setDifficulty('NORMAL', 120, 14.0);
-            this.audioStatusText.textContent = 'Modo Synthwave Normal (120 BPM)';
-            this.generateBeatmap(180, 120);
-            this.startGame();
+            this.startPresetGame('NORMAL', 120, 14.0);
         });
 
         this.btnSynthHard.addEventListener('click', () => {
-            initAudioContext();
-            this.setDifficulty('HARD', 140, 18.0);
-            this.audioStatusText.textContent = 'Modo Cyber Rush (140 BPM)';
-            this.generateBeatmap(180, 140);
-            this.startGame();
+            this.startPresetGame('HARD', 140, 18.0);
         });
 
         this.btnSynthExpert.addEventListener('click', () => {
-            initAudioContext();
-            this.setDifficulty('EXPERT', 165, 22.0);
-            this.audioStatusText.textContent = 'Modo Expert Blast (165 BPM)';
-            this.generateBeatmap(180, 165);
-            this.startGame();
+            this.startPresetGame('EXPERT', 165, 22.0);
         });
 
         // Carga de archivo MP3 del usuario
@@ -497,6 +487,246 @@ class BeatSaberGame {
                 this.startGame();
             }
         });
+    }
+
+    startPresetGame(diffName, bpm, speed) {
+        if (!this.audioCtx) {
+            this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        } else if (this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+        this.setDifficulty(diffName, bpm, speed);
+        if (this.audioStatusText) {
+            this.audioStatusText.textContent = `Modo ${diffName} (${bpm} BPM)`;
+        }
+        this.generateBeatmap(180, bpm);
+        this.startGame();
+    }
+
+    exitVR() {
+        if (this.renderer && this.renderer.xr) {
+            const session = this.renderer.xr.getSession();
+            if (session) {
+                session.end();
+            }
+        }
+    }
+
+    /**
+     * Utilidad para crear texturas de Canvas 2D para materiales 3D
+     */
+    createCanvasTexture(width, height, drawFn) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        drawFn(ctx, width, height);
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.needsUpdate = true;
+        return { canvas, ctx, texture };
+    }
+
+    /**
+     * Crea un botón 3D neón interactuable con el sable
+     */
+    createVRButton3D(text, colorHex, width = 1.8, height = 0.38, onClick) {
+        const texObj = this.createCanvasTexture(512, 128, (ctx, w, h) => {
+            ctx.fillStyle = 'rgba(10, 10, 25, 0.88)';
+            ctx.fillRect(0, 0, w, h);
+
+            const colorStr = `#${colorHex.toString(16).padStart(6, '0')}`;
+            ctx.strokeStyle = colorStr;
+            ctx.lineWidth = 8;
+            ctx.strokeRect(6, 6, w - 12, h - 12);
+
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 32px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text, w / 2, h / 2);
+        });
+
+        const geom = new THREE.PlaneGeometry(width, height);
+        const mat = new THREE.MeshBasicMaterial({
+            map: texObj.texture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        return { mesh, texObj, onClick };
+    }
+
+    /**
+     * Construye el Menú Principal 3D flotante en el espacio VR
+     */
+    setupVR3DUI() {
+        this.vrMenuGroup = new THREE.Group();
+        this.vrMenuGroup.position.set(0, 1.5, -2.2);
+        this.vrMenuGroup.visible = false;
+        this.scene.add(this.vrMenuGroup);
+
+        this.vrMenuButtons = [];
+        this.vrButtonCooldown = 0;
+
+        // Placa de título
+        const titleTexObj = this.createCanvasTexture(512, 128, (ctx, w, h) => {
+            ctx.fillStyle = 'rgba(5, 5, 15, 0.92)';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(4, 4, w - 8, h - 8);
+            ctx.fillStyle = '#00f3ff';
+            ctx.font = 'bold 38px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('BEAT SABER VR', w / 2, h / 3 + 4);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = '22px sans-serif';
+            ctx.fillText('Toca un botón con tu sable', w / 2, (h * 2) / 3 + 4);
+        });
+        const titleMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(2.2, 0.55),
+            new THREE.MeshBasicMaterial({ map: titleTexObj.texture, transparent: true, side: THREE.DoubleSide })
+        );
+        titleMesh.position.y = 0.85;
+        this.vrMenuGroup.add(titleMesh);
+
+        // Botones de dificultad y salida
+        const btnConfigs = [
+            { text: '⚡ NORMAL  120 BPM', color: 0x00f3ff, y:  0.25, action: () => this.startPresetGame('NORMAL', 120, 14.0) },
+            { text: '💥 HARD  140 BPM',   color: 0xff0055, y: -0.25, action: () => this.startPresetGame('HARD', 140, 18.0) },
+            { text: '🔥 EXPERT  165 BPM', color: 0xb026ff, y: -0.75, action: () => this.startPresetGame('EXPERT', 165, 22.0) },
+            { text: '🚪 SALIR DE VR',      color: 0xffb700, y: -1.25, action: () => this.exitVR() }
+        ];
+
+        btnConfigs.forEach(cfg => {
+            const btnObj = this.createVRButton3D(cfg.text, cfg.color, 2.0, 0.4, cfg.action);
+            btnObj.mesh.position.y = cfg.y;
+            this.vrMenuGroup.add(btnObj.mesh);
+            this.vrMenuButtons.push(btnObj);
+        });
+    }
+
+    /**
+     * Construye el HUD de Puntuación 3D visible durante la partida en VR
+     */
+    setupVRScoreHUD() {
+        this.vrHUDGroup = new THREE.Group();
+        this.vrHUDGroup.position.set(0, 2.8, -4.5);
+        this.vrHUDGroup.rotation.x = 0.18;
+        this.vrHUDGroup.visible = false;
+        this.scene.add(this.vrHUDGroup);
+
+        this.vrHUDButtons = [];
+
+        // Panel de puntuación
+        this.vrHUDTexObj = this.createCanvasTexture(512, 128, (ctx, w, h) => {
+            ctx.fillStyle = 'rgba(5, 5, 15, 0.88)';
+            ctx.fillRect(0, 0, w, h);
+            ctx.strokeStyle = '#00f3ff';
+            ctx.lineWidth = 6;
+            ctx.strokeRect(4, 4, w - 8, h - 8);
+            ctx.fillStyle = '#00f3ff';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('SCORE: 000000', 25, 45);
+            ctx.fillStyle = '#ff0055';
+            ctx.font = 'bold 28px sans-serif';
+            ctx.textAlign = 'right';
+            ctx.fillText('COMBO: x1', w - 25, 45);
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 22px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('MODO: NORMAL', w / 2, 95);
+        });
+
+        const hudMesh = new THREE.Mesh(
+            new THREE.PlaneGeometry(3.4, 0.85),
+            new THREE.MeshBasicMaterial({ map: this.vrHUDTexObj.texture, transparent: true, side: THREE.DoubleSide })
+        );
+        this.vrHUDGroup.add(hudMesh);
+
+        // Botón de salida flotante durante la partida
+        const btnExit = this.createVRButton3D('🚪 SALIR DE VR', 0xffb700, 1.4, 0.35, () => this.exitVR());
+        btnExit.mesh.position.set(0, -0.68, 0);
+        this.vrHUDGroup.add(btnExit.mesh);
+        this.vrHUDButtons.push(btnExit);
+    }
+
+    /**
+     * Actualiza el Canvas 3D del HUD de puntuación en tiempo real
+     */
+    updateVRScoreHUD() {
+        if (!this.vrHUDTexObj) return;
+        const { ctx, canvas, texture } = this.vrHUDTexObj;
+        const w = canvas.width;
+        const h = canvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+        ctx.fillStyle = 'rgba(5, 5, 15, 0.88)';
+        ctx.fillRect(0, 0, w, h);
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(4, 4, w - 8, h - 8);
+
+        ctx.fillStyle = '#00f3ff';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`SCORE: ${String(this.score).padStart(6, '0')}`, 25, 45);
+
+        ctx.fillStyle = '#ff0055';
+        ctx.font = 'bold 28px sans-serif';
+        ctx.textAlign = 'right';
+        ctx.fillText(`COMBO: x${this.combo}`, w - 25, 45);
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 22px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`MODO: ${this.difficulty}`, w / 2, 95);
+
+        texture.needsUpdate = true;
+    }
+
+    /**
+     * Detección de colisión entre la punta de los sables y los botones 3D del VR
+     */
+    checkVR3DUIInteractions(delta) {
+        this.vrButtonCooldown = Math.max(0, (this.vrButtonCooldown || 0) - delta);
+
+        const isVR = this.renderer.xr.isPresenting;
+
+        // Menú principal: visible cuando está en VR y NO está jugando
+        if (this.vrMenuGroup) this.vrMenuGroup.visible = isVR && !this.isPlaying;
+        // HUD de puntuación: visible siempre que esté en VR
+        if (this.vrHUDGroup) this.vrHUDGroup.visible = isVR;
+
+        if (!isVR || this.vrButtonCooldown > 0) return;
+
+        // Seleccionar los botones activos según el estado del juego
+        const activeButtons = !this.isPlaying ? this.vrMenuButtons : this.vrHUDButtons;
+        if (!activeButtons || activeButtons.length === 0) return;
+
+        const getSaberTip = (saber) => {
+            if (!saber || !saber.group) return null;
+            const tip = new THREE.Vector3(0, 1.1, 0);
+            saber.group.localToWorld(tip);
+            return tip;
+        };
+
+        const leftTip = getSaberTip(this.leftSaber);
+        const rightTip = getSaberTip(this.rightSaber);
+        const btnPos = new THREE.Vector3();
+
+        for (const btnObj of activeButtons) {
+            btnObj.mesh.getWorldPosition(btnPos);
+            const hitLeft  = leftTip  && leftTip.distanceTo(btnPos)  < 0.38;
+            const hitRight = rightTip && rightTip.distanceTo(btnPos) < 0.38;
+            if (hitLeft || hitRight) {
+                this.vrButtonCooldown = 0.8;
+                btnObj.onClick();
+                break;
+            }
+        }
     }
 
     setDifficulty(diffName, bpm, speed) {
@@ -891,6 +1121,7 @@ class BeatSaberGame {
             else if (this.combo >= 4) this.comboBadgeEl.classList.add('streak-4');
             else if (this.combo >= 2) this.comboBadgeEl.classList.add('streak-2');
         }
+        this.updateVRScoreHUD();
     }
 
     onWindowResize() {
@@ -996,6 +1227,9 @@ class BeatSaberGame {
         } else {
             this.camera.position.copy(this.cameraBasePos);
         }
+
+        // 7. Interacción y Menú 3D en VR
+        this.checkVR3DUIInteractions(delta);
 
         // 7. Renderizado: Renderizado directo estéreo en VR / Composer en escritorio
         if (this.renderer.xr.isPresenting) {
